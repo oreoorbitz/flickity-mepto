@@ -1,0 +1,10 @@
+node_modules
+dist
+package-lock.json
+src-orig
+README.upstream.md
+package.upstream.json
+css/flickity.css
+test/mepto.js
+test-results
+playwright-report

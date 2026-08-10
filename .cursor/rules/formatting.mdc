@@ -1,0 +1,11 @@
+---
+description: Formatting and style — humans + LLMs
+globs: ["**/*.{js,ts,json,md,html,css}"]
+alwaysApply: true
+---
+
+- **Prettier is the formatter** (`prettier.requireConfig: true`, `formatOnSave: true`). Do not hand-format `dist/` — it is a build artifact (`vite build`).
+- **ESLint is the linter** (`eslint.enable: true`, `validate: ["javascript","typescript"]`, `source.fixAll.eslint` on save). Fix `npx eslint src --ext .js` before commit.
+- **EditorConfig** (`indent_size=2`, `trim_trailing_whitespace=true`, `insert_final_newline=true`, `files.eol="\n"`). Cursor reads `.editorconfig` + `.vscode/settings.json` — keep them in sync.
+- **No `src-orig/` / `README.upstream.md` edits** — verbatim upstream v2.3.0 reference.
+- **AGENTS.md is the router** — follow it, then `CONTRIBUTING.md` for harness, `PERFORMANCE_GUIDE.md` for perf. This file only enforces style; do not duplicate logic here.

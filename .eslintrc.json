@@ -1,0 +1,30 @@
+{
+  "env": {
+    "browser": true,
+    "es2022": true,
+    "amd": true,
+    "node": true
+  },
+  "extends": "eslint:recommended",
+  "parserOptions": {
+    "ecmaVersion": 2022,
+    "sourceType": "module"
+  },
+  "rules": {
+    "no-unused-vars": [
+      "warn",
+      {
+        "argsIgnorePattern": "^_"
+      }
+    ],
+    "no-console": "off",
+    "no-empty": "off",
+    "no-undef": "off",
+    "no-extra-semi": "off"
+  },
+  "globals": {
+    "define": "readonly",
+    "module": "readonly",
+    "require": "readonly"
+  }
+}

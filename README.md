@@ -25,15 +25,15 @@ npm install flickity-mepto meptos
 
 ## jQuery surface mapped → Mepto
 
-| Upstream `js/flickity.js` line | jQuery | Mepto equivalent |
-|---|---|---|
-| 50 `var jQuery = window.jQuery` | `window.jQuery` | `window.mepto \|\| window.jQuery \|\| window.$` |
-| 85 `this.$element = jQuery(this.element)` | `$(el)` | `$ (mepto)`, same |
-| 483 `new jQuery.Event(event)` | `$.Event` | `new $.Event` (mepto Event) or fallback `new Event` |
-| 493 `this.$element.trigger($event, args)` | `$().trigger` | `$.fn.trigger` (mepto) |
-| 897 `jQuery.removeData(el,'flickity')` | `$.removeData` | `el.flickityGUID` delete + `delete instances[guid]` (mepto has no removeData) |
-| 922 `jQuery.bridget('flickity',F)` | `$.bridget` | shim `src/mepto-bridget.js` → `$.fn.flickity` |
-| 926 `Flickity.setJQuery(jq)` | rebind internal `jQuery` | `setMepto = setJQuery` alias, both set `$` |
+| Upstream `js/flickity.js` line            | jQuery                   | Mepto equivalent                                                              |
+| ----------------------------------------- | ------------------------ | ----------------------------------------------------------------------------- |
+| 50 `var jQuery = window.jQuery`           | `window.jQuery`          | `window.mepto \|\| window.jQuery \|\| window.$`                               |
+| 85 `this.$element = jQuery(this.element)` | `$(el)`                  | `$ (mepto)`, same                                                             |
+| 483 `new jQuery.Event(event)`             | `$.Event`                | `new $.Event` (mepto Event) or fallback `new Event`                           |
+| 493 `this.$element.trigger($event, args)` | `$().trigger`            | `$.fn.trigger` (mepto)                                                        |
+| 897 `jQuery.removeData(el,'flickity')`    | `$.removeData`           | `el.flickityGUID` delete + `delete instances[guid]` (mepto has no removeData) |
+| 922 `jQuery.bridget('flickity',F)`        | `$.bridget`              | shim `src/mepto-bridget.js` → `$.fn.flickity`                                 |
+| 926 `Flickity.setJQuery(jq)`              | rebind internal `jQuery` | `setMepto = setJQuery` alias, both set `$`                                    |
 
 ## Layout
 
@@ -68,11 +68,13 @@ nvm use
 ## Use
 
 **Shopify theme (IIFE):**
+
 ```liquid
 {{ 'mepto.js' | asset_url | script_tag }}
 {{ 'flickity-mepto.js' | asset_url | script_tag }}
 {{ 'flickity.css' | asset_url | stylesheet_tag }}
 ```
+
 ```js
 new Flickity('.carousel', { cellAlign: 'left', contain: true })
 $('.carousel').flickity({ wrapAround: true }) // bridget via Mepto
@@ -80,6 +82,7 @@ Flickity.setJQuery = Flickity.setMepto // compat
 ```
 
 **ESM:**
+
 ```js
 import Flickity from 'flickity-mepto' // or 'flickity-mepto/dist/flickity.esm.js'
 import 'flickity-mepto/css/flickity.css'

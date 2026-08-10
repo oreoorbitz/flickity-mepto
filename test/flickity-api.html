@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Flickity-Mepto API Compatibility Harness</title>
+    <link rel="stylesheet" href="../css/flickity.css" />
+    <style>
+      .carousel {
+        background: #fafafa;
+      }
+      .carousel-cell {
+        width: 200px;
+        height: 100px;
+        background: #ddd;
+        margin-right: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Flickity-Mepto API Test</h1>
+
+    <div class="carousel" id="test-carousel">
+      <div class="carousel-cell">1</div>
+      <div class="carousel-cell">2</div>
+      <div class="carousel-cell">3</div>
+    </div>
+
+    <div class="carousel" id="bridget-carousel">
+      <div class="carousel-cell">A</div>
+      <div class="carousel-cell">B</div>
+    </div>
+
+    <pre id="results"></pre>
+
+    <script src="./mepto.js"></script>
+    <script src="../dist/flickity.pkgd.js"></script>
+    <script>
+      ;(function () {
+        var out = []
+        function log(msg, pass) {
+          out.push((pass ? 'PASS' : 'FAIL') + ': ' + msg)
+        }
+        function assert(name, cond) {
+          log(name, !!cond)
+          if (!cond) console.error('FAIL', name)
+        }
+
+        try {
+          // 1. new Flickity
+          var elem = document.getElementById('test-carousel')
+          var flkty = new Flickity(elem, { cellAlign: 'left', contain: true, draggable: false })
+          assert('new Flickity creates instance', !!flkty)
+          assert('Flickity.defaults exists', !!Flickity.defaults)
+          assert('Flickity.Cell exists', !!Flickity.Cell)
+          assert('Flickity.Slide exists', !!Flickity.Slide)
+          assert('instance.element === elem', flkty.element === elem)
+          assert('instance.cells.length === 3', flkty.cells.length === 3)
+          assert('instance.selectedIndex === 0', flkty.selectedIndex === 0)
+          assert('Flickity.data returns same instance', Flickity.data(elem) === flkty)
+          assert('Flickity.data via selector string', Flickity.data('#test-carousel') === flkty)
+
+          // 2. select / next / previous
+          flkty.select(1, false, true)
+          assert('select(1) moves to 1', flkty.selectedIndex === 1)
+          flkty.next(false, true)
+          assert('next() moves to 2', flkty.selectedIndex === 2)
+          flkty.previous(false, true)
+          assert('previous() moves to 1', flkty.selectedIndex === 1)
+          flkty.select(0, false, true)
+          assert('select(0) back to 0', flkty.selectedIndex === 0)
+
+          // 3. resize / reposition
+          flkty.resize()
+          assert('resize keeps selectedIndex', flkty.selectedIndex === 0)
+          flkty.reposition()
+          assert('reposition keeps selectedIndex', flkty.selectedIndex === 0)
+
+          // 4. events via EvEmitter + Mepto trigger
+          var selectFired = false
+          flkty.on('select', function () {
+            selectFired = true
+          })
+          flkty.select(1, false, true)
+          assert('EvEmitter select event fires', selectFired)
+
+          var meptoSelectFired = false
+          // Mepto trigger path: dispatchEvent also triggers $element
+          if (flkty.$element && flkty.$element.on) {
+            flkty.$element.on('select.flickity', function () {
+              meptoSelectFired = true
+            })
+            flkty.select(0, false, true)
+            // dispatchEvent triggers Mepto synchronously
+            assert('Mepto $element select.flickity fires', meptoSelectFired)
+          } else {
+            log('Mepto $element trigger path (skipped - no $element)', true)
+          }
+
+          // 5. bridget $.fn.flickity
+          var bridgetEl = document.getElementById('bridget-carousel')
+          var $ = window.mepto || window.jQuery
+          assert('Mepto $ exists for bridget', !!$ && !!$.fn)
+          assert('$.fn.flickity exists (bridget)', !!$.fn.flickity)
+          // init via bridget
+          $(bridgetEl).flickity({ cellAlign: 'left', contain: true, draggable: false })
+          var bridgetInst = Flickity.data(bridgetEl)
+          assert('bridget init creates Flickity.data', !!bridgetInst)
+          assert('bridget instance cells 2', bridgetInst.cells.length === 2)
+          // method via bridget string
+          $(bridgetEl).flickity('select', 1)
+          assert('bridget select via string moves to 1', bridgetInst.selectedIndex === 1)
+          // setJQuery / setMepto alias
+          assert('Flickity.setJQuery exists', typeof Flickity.setJQuery === 'function')
+          assert('Flickity.setMepto alias exists', typeof Flickity.setMepto === 'function')
+          Flickity.setMepto($)
+          assert('setMepto does not throw', true)
+          Flickity.setJQuery($)
+          assert('setJQuery does not throw', true)
+
+          // 6. destroy
+          var destroyEl = bridgetEl
+          var inst = Flickity.data(destroyEl)
+          inst.destroy()
+          assert('destroy removes Flickity.data', !Flickity.data(destroyEl))
+          assert(
+            'destroy removes flickity-enabled class',
+            !destroyEl.classList.contains('flickity-enabled')
+          )
+
+          // 7. htmlInit data-flickity
+          var htmlInitEl = document.createElement('div')
+          htmlInitEl.className = 'carousel'
+          htmlInitEl.setAttribute(
+            'data-flickity',
+            JSON.stringify({ cellAlign: 'left', contain: true, draggable: false })
+          )
+          htmlInitEl.innerHTML =
+            '<div class="carousel-cell">x</div><div class="carousel-cell">y</div>'
+          document.body.appendChild(htmlInitEl)
+          // htmlInit is called automatically on DOMContentLoaded, but we trigger manually via Flickity init
+          // utils.htmlInit would have already run; test that data-flickity element can be new Flickity without error
+          var htmlInst = new Flickity(htmlInitEl)
+          assert(
+            'data-flickity element new Flickity works',
+            !!htmlInst && htmlInst.cells.length === 2
+          )
+          htmlInst.destroy()
+          htmlInitEl.remove()
+
+          // cleanup main
+          flkty.destroy()
+          assert('main destroy removes data', !Flickity.data(elem))
+        } catch (e) {
+          log('exception: ' + e.message + '\n' + e.stack, false)
+          console.error(e)
+        }
+
+        var results = out.join('\n')
+        document.getElementById('results').textContent = results
+        window.__flickityApiResults = out
+        window.__flickityApiFailed = out.some(function (l) {
+          return l.indexOf('FAIL') === 0
+        })
+        console.log(results)
+      })()
+    </script>
+  </body>
+</html>
