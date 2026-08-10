@@ -1,0 +1,35 @@
+name: docs
+on:
+  push:
+    branches: [main]
+    paths: ['docs/site/**', '.github/workflows/docs.yml']
+  workflow_dispatch:
+permissions:
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci || npm install
+      - run: npm run build
+      - run: cp dist/flickity.pkgd.min.js docs/site/assets/flickity.pkgd.min.js
+      - run: cp dist/flickity.min.css docs/site/assets/flickity.css 2>/dev/null || cp css/flickity.css docs/site/assets/flickity.css
+      - run: cp node_modules/meptos/dist/meptos.umd.cjs docs/site/assets/meptos.umd.cjs 2>/dev/null || cp ../Mepto/dist/meptos.umd.cjs docs/site/assets/meptos.umd.cjs 2>/dev/null || echo "meptos bundle not found — will use cdn fallback"
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/site
+      - id: deployment
+        uses: actions/deploy-pages@v4
