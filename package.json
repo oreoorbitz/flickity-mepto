@@ -1,15 +1,53 @@
 {
   "name": "flickity-mepto",
   "version": "2.3.0-mepto.1",
-  "description": "Flickity 2.3.0 — Mepto-integrated, jQuery-free carousel. Drop-in, same Flickity API.",
+  "description": "Flickity 2.3.0 — Mepto-integrated, jQuery-free carousel. Drop-in, same Flickity API. Migrate legacy Shopify themes off jQuery.",
   "type": "module",
   "main": "dist/flickity.pkgd.js",
   "module": "dist/flickity.esm.js",
   "style": "dist/flickity.min.css",
-  "files": ["dist", "src", "css", "README.md"],
+  "exports": {
+    ".": {
+      "import": "./dist/flickity.esm.js",
+      "require": "./dist/flickity.pkgd.js"
+    },
+    "./css": "./css/flickity.css",
+    "./dist/flickity.css": "./css/flickity.css"
+  },
+  "files": [
+    "dist",
+    "src",
+    "css",
+    "README.md",
+    "README.upstream.md"
+  ],
   "scripts": {
-    "build": "vite build",
-    "dev": "vite build --watch"
+    "clean": "node -e \"fs.rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npm run clean && vite build && npm run build:min",
+    "build:min": "vite build --config vite.min.config.mjs",
+    "dev": "vite build --watch",
+    "preview": "vite preview",
+    "lint": "echo \"no lint yet — add eslint when needed\"",
+    "test": "echo \"no tests yet — add vitest + happy-dom when needed\""
+  },
+  "keywords": [
+    "flickity",
+    "carousel",
+    "mepto",
+    "zepto",
+    "jquery-free",
+    "shopify",
+    "esm"
+  ],
+  "author": "Metafizzy (upstream) + oreoorbitz/flickity-mepto (mepto port)",
+  "license": "GPL-3.0-or-Commercial",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oreoorbitz/flickity-mepto.git"
+  },
+  "homepage": "https://github.com/oreoorbitz/flickity-mepto#readme",
+  "bugs": {
+    "url": "https://github.com/oreoorbitz/flickity-mepto/issues"
   },
   "peerDependencies": {
     "meptos": ">=2.0.0"
@@ -22,6 +60,11 @@
     "unidragger": "^2.4.0",
     "unipointer": "^2.4.0"
   },
-  "license": "GPL-3.0-or-Commercial",
-  "author": "Metafizzy (upstream) + oreoorbitz/flickity-mepto (mepto port)"
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "vite": "^8.2.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
 }

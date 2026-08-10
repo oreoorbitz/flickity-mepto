@@ -1,0 +1,13 @@
+Flickity (upstream) — Copyright 2015-2021 Metafizzy
+
+Licensed GPLv3 for open source use or Flickity Commercial License for commercial use.
+See https://flickity.metafizzy.co for commercial licensing.
+
+Flickity Commercial License: https://flickity.metafizzy.co/license.html
+GPLv3: https://www.gnu.org/licenses/gpl-3.0.html
+
+flickity-mepto (this fork) — Mepto integration patch
+Copyright 2026 oreoorbitz
+
+Same license as upstream: GPLv3 for open source, Commercial requires Metafizzy license.
+Mepto integration code (src/mepto-bridget.js, flickity.js mepto shim) is MIT-licensed in addition where not derived from upstream.
