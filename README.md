@@ -4,9 +4,10 @@ Efficient, drop-in replacement for `Flickity PACKAGED v2.3.0` (last upstream rel
 
 ## Why
 
-- Example bundled vendor `assets/custom-plugin.js` (123K) bundles `Flickity PACKAGED v2.2.2 PACKAGED = jquery-bridget v2.0.1 + ev-emitter + get-size + fizzy-ui-utils + unidragger/unipointer + flickity core` and expects `window.jQuery` / `$.bridget` / `$.data` / `$.Event` / `$element.trigger`.
-- Theme also ships `swiper-bundle.js` (151K) — duplicate carousel, choose one.
-- `getSize v2.0.3` itself is vanilla (0 jQuery) and stays as-is; the modernization target is Flickity’s jQuery surface, not getSize.
+Legacy Shopify themes (and other sites) bundle Flickity via `jquery-bridget` and expect `window.jQuery` (`$.bridget`, `$.data`, `$.Event`, `$element.trigger`). This fork keeps every Flickity API and swaps that surface for Mepto (`window.mepto || window.jQuery`), so themes can drop jQuery.
+
+- Upstream `Flickity PACKAGED v2.2.2/v2.3.0 = jquery-bridget v2.0.1 + ev-emitter + get-size + fizzy-ui-utils + unidragger/unipointer + flickity core` — the only jQuery touch is the bridget/data/event layer.
+- `getSize v2.0.3` is vanilla (0 jQuery) and stays as-is.
 
 ## Goal — keep every Flickity API, replace jQuery with Mepto
 
@@ -43,8 +44,8 @@ flickity-mepto/
 ## Build
 
 ```sh
-npm --prefix flickity-mepto install
-npm --prefix flickity-mepto run build   # Vite ESM + IIFE, mepto external
+npm install
+npm run build   # Vite ESM + IIFE, mepto external
 ```
 
 `dist/flickity.pkgd.js` is IIFE global `Flickity` (theme `<script>`), `dist/flickity.esm.js` is ESM `import Flickity from 'flickity-mepto'` with `mepto` external.
@@ -53,8 +54,12 @@ npm --prefix flickity-mepto run build   # Vite ESM + IIFE, mepto external
 
 ```liquid
 {{ 'mepto.js' | asset_url | script_tag }}
-{{ 'flickity-mepto/dist/flickity.pkgd.min.js' | asset_url | script_tag }}
-{{ 'flickity-mepto/dist/flickity.min.css' | asset_url | stylesheet_tag }}
+{{ 'flickity-mepto.js' | asset_url | script_tag }}
+{{ 'flickity.css' | asset_url | stylesheet_tag }}
 ```
 
-Then `new Flickity('.carousel')` and `$('.carousel').flickity()` both work. `Flickity.setJQuery = Flickity.setMepto` for compat.
+Then `new Flickity('.carousel')` and `$('.carousel').flickity()` both work. `Flickity.setJQuery = Flickity.setMepto` for compat. Use this to migrate any jQuery-Flickity Shopify theme off jQuery.
+
+## License
+
+GPLv3 for open source, Commercial for commercial use — same as upstream Flickity. See https://flickity.metafizzy.co for commercial licensing.
