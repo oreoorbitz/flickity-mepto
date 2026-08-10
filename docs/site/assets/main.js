@@ -74,20 +74,28 @@ $(() => {
 
   // --- Flickity demos (Flickity-Mepto, Mepto for controls) ---
   // hero already via data-flickity htmlInit; init the demo carousels via Mepto + Flickity
-  const $wrap = $('#demo-wrap-carousel')
-  if ($wrap.length) {
-    // Mepto bridget: $(el).flickity(opts)
-    $wrap.flickity({ cellAlign: 'left', contain: true, wrapAround: true, pageDots: true, prevNextButtons: true })
+  // Fallback to vanilla Flickity if Mepto bridget not ready (ensures demos never stay stacked vertically)
+  function initDemo(selector, opts) {
+    const el = document.querySelector(selector)
+    if (!el) return null
+    try {
+      const $el = window.$ ? window.$(el) : null
+      if ($el && $el.flickity) { $el.flickity(opts); return window.Flickity.data(el) }
+    } catch (e) { console.warn('Mepto bridget failed for', selector, e) }
+    // vanilla fallback (no Mepto)
+    return new window.Flickity(el, opts)
+  }
+  const wrapInst = initDemo('#demo-wrap-carousel', { cellAlign: 'left', contain: true, wrapAround: true, pageDots: true, prevNextButtons: true })
+  if (wrapInst) {
     $('[data-demo="wrap"]').on('click', e => {
       const action = e.currentTarget.getAttribute('data-action')
-      const inst = window.Flickity.data($wrap[0])
-      if (action === 'next') inst.next()
-      else inst.previous()
+      if (action === 'next') wrapInst.next()
+      else wrapInst.previous()
     })
   }
-  $('#demo-contain-carousel').flickity({ cellAlign: 'left', contain: true })
-  $('#demo-group-carousel').flickity({ groupCells: 2, cellAlign: 'left', contain: true })
-  $('#demo-lazy-carousel').flickity({ lazyLoad: 1, cellAlign: 'left', contain: true })
+  initDemo('#demo-contain-carousel', { cellAlign: 'left', contain: true })
+  initDemo('#demo-group-carousel', { groupCells: 2, cellAlign: 'left', contain: true })
+  initDemo('#demo-lazy-carousel', { lazyLoad: 1, cellAlign: 'left', contain: true })
 
   // --- init ---
   measure()
