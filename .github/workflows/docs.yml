@@ -25,17 +25,17 @@ jobs:
       - run: npm run build
       - run: cp dist/flickity.pkgd.min.js docs/site/assets/flickity.pkgd.min.js
       - run: cp dist/flickity.min.css docs/site/assets/flickity.css 2>/dev/null || cp css/flickity.css docs/site/assets/flickity.css
+      - uses: actions/checkout@v4
+        with:
+          repository: oreoorbitz/Mepto
+          path: ../Mepto
+        continue-on-error: true
       - run: |
-          if [ -s docs/site/assets/meptos.umd.cjs ] && [ $(wc -c < docs/site/assets/meptos.umd.cjs) -gt 10000 ]; then
-            echo "vendored meptos UMD present ($(wc -c < docs/site/assets/meptos.umd.cjs) bytes), keeping"
-          else
-            npm install meptos@latest --no-save 2>/dev/null || true
-            cp node_modules/meptos/dist/meptos.umd.cjs docs/site/assets/meptos.umd.cjs 2>/dev/null || cp ../Mepto/dist/meptos.umd.cjs docs/site/assets/meptos.umd.cjs 2>/dev/null || (echo "meptos UMD not found — fetching from CDN" && curl -fsSL https://unpkg.com/meptos@latest/dist/meptos.umd.cjs -o docs/site/assets/meptos.umd.cjs) || echo "meptos bundle not found — will use cdn fallback"
-            # npm meptos@2.0.0 ships broken 611B UMD (re-exports empty object); if still small, fetch correct build from Mepto repo
-            if [ ! -s docs/site/assets/meptos.umd.cjs ] || [ $(wc -c < docs/site/assets/meptos.umd.cjs) -lt 10000 ]; then
-              echo "meptos UMD still missing/small ($(wc -c < docs/site/assets/meptos.umd.cjs 2>/dev/null || echo 0) bytes), fetching correct build from Mepto repo"
-              curl -fsSL https://raw.githubusercontent.com/oreoorbitz/Mepto/main/dist/meptos.umd.cjs -o docs/site/assets/meptos.umd.cjs || echo "raw github fallback failed"
-            fi
+          mkdir -p docs/site/assets
+          cp ../Mepto/dist/meptos.umd.cjs docs/site/assets/meptos.umd.cjs 2>/dev/null || (rm -rf ../Mepto 2>/dev/null; git clone --depth 1 https://github.com/oreoorbitz/Mepto.git ../Mepto 2>/dev/null && cp ../Mepto/dist/meptos.umd.cjs docs/site/assets/meptos.umd.cjs 2>/dev/null) || true
+          if [ ! -s docs/site/assets/meptos.umd.cjs ] || [ $(wc -c < docs/site/assets/meptos.umd.cjs 2>/dev/null || echo 0) -lt 10000 ]; then
+            echo "meptos UMD missing/small, fetching from Mepto repo raw"
+            curl -fsSL https://raw.githubusercontent.com/oreoorbitz/Mepto/main/dist/meptos.umd.cjs -o docs/site/assets/meptos.umd.cjs || echo "raw github fallback failed"
           fi
           ls -lh docs/site/assets/meptos.umd.cjs 2>&1 || echo "no meptos UMD after fallback"
       - uses: actions/configure-pages@v5
