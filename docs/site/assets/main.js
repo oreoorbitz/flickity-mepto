@@ -4,7 +4,16 @@
 // dogfood the library. `$` is the global exposed by assets/meptos.umd.cjs.
 // Flickity demos also use Mepto via window.mepto || window.jQuery fallback.
 
-$(() => {
+// Robust ready: Mepto's $ may be object if UMD failed; fall back to vanilla
+const $ = (typeof window.$ === 'function' && window.$) || window.mepto || window.jQuery;
+function onReady(fn) {
+  if ($) {
+    try { return $(fn); } catch (e) { console.warn('Mepto ready failed, using DOMContentLoaded', e); }
+  }
+  if (document.readyState !== 'loading') fn();
+  else document.addEventListener('DOMContentLoaded', fn);
+}
+onReady(() => {
   const $window = $(window)
   const $sidebar = $('#sidebar')
   const $backToTop = $('#back-to-top')
