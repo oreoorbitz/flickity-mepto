@@ -23,6 +23,18 @@ proto._createLazyload = function () {
     return;
   }
 
+  // defer until cells are in DOM — _create runs before activate (slider empty)
+  // so observe on activate (and handle already-active case for programmatic init)
+  const setup = () => this._setupLazyObserver();
+  this.on('activate', setup);
+  if (this.isActive) setup();
+
+  // also handle future cells added via insert/append — observe new lazy imgs
+  this.on('cellChange', this._observeNewLazyImages);
+};
+
+proto._setupLazyObserver = function () {
+  if (this._lazyObserver) return;
   // one-time bulk read (Part I §3/§5) — not per-select
   const imgs = utils.makeArray(this.slider.querySelectorAll(LAZY_SELECTOR));
   if (!imgs.length) return;
@@ -53,10 +65,6 @@ proto._createLazyload = function () {
 
   for (let i = 0; i < imgs.length; i++) obs.observe(imgs[i]);
   this._lazyObserver = obs;
-
-  // also handle future cells added via insert/append — observe new lazy imgs
-  // cellChange fires after insert/remove; observe any still-data- imgs in affected range
-  this.on('cellChange', this._observeNewLazyImages);
 };
 
 proto._observeNewLazyImages = function () {
