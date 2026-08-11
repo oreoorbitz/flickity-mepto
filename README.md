@@ -40,28 +40,39 @@ npm install flickity-mepto meptos
 ```
 flickity-mepto/
   src-orig/          # verbatim v2.3.0 js/ (reference, do not edit)
-  src/               # mepto-integrated ESM (patched flickity.js + mepto-bridget.js + verbatim others)
+  src/               # modern ESM (ES2024, Babel → last 3 versions) + perf batching
+    flickity.js      # Map instances, shape-stable ctor, DocumentFragment batch, scheduler import
+    cell.js/slide.js # class syntax, shape-stable
+    animate.js       # hoisted modulo, _boundAnimate per-rAF (no closure per frame)
+    drag.js          # rAF-coalesced pointerMove via scheduler.mutate
+    lazyload.js      # IntersectionObserver(root:viewport) + native loading/decoding, single QSA at activate
+    scheduler.js     # tiny FastDOM measure/mutate (rAF, reads→writes)
+    mepto-bridget.js # ESM bridget shim
   css/flickity.css   # verbatim (copy to dist/flickity.css on build if needed)
   dist/              # Vite build output (gitignored, published to npm)
-    flickity.esm.js       79K ESM unminified
-    flickity.esm.min.js   59K ESM minified
-    flickity.pkgd.js      81K IIFE unminified (global Flickity)
-    flickity.pkgd.min.js  45K IIFE minified
-  vite.config.mjs         # unminified ESM + IIFE
-  vite.min.config.mjs     # minified
+    flickity.esm.js       ~90K ESM unminified (Babel, esnext→last 3)
+    flickity.esm.min.js   ~70K ESM minified
+    flickity.pkgd.js      ~93K IIFE unminified (global Flickity)
+    flickity.pkgd.min.js  ~52K IIFE minified (14.8K gzip)
+  vite.config.mjs         # esnext + @rollup/plugin-babel (bundled helpers, last 3)
+  vite.min.config.mjs     # esnext + babel + esbuild min
+  babel.config.json       # preset-env targets last 3, bugfixes true
 ```
 
 ## Build
 
 ```sh
-# dev — watch
+# dev — watch (esnext source, Babel in vite pipeline)
 npm run dev      # vite build --watch → dist/*.js (unminified, fast)
 
-# prod — clean + unminified + minified
-npm run build    # clean && vite build && vite build --config vite.min.config.mjs
-# outputs: dist/flickity.esm.js, flickity.pkgd.js, flickity.esm.min.js, flickity.pkgd.min.js
+# prod — clean + unminified + minified (Babel last 3 → 14.8K gzip)
+npm run build    # clean && vite build && vite build --config vite.min.config.mjs && banner
+# outputs: dist/flickity.esm.js (~90K), flickity.pkgd.js (~93K), flickity.esm.min.js (~70K), flickity.pkgd.min.js (~52K)
 
-# node 18+ required (see .nvmrc)
+# verify
+npm test         # Playwright 7 groups, 30 checks, ~1s
+
+# node 22 LTS required (see .nvmrc, engines >=18)
 nvm use
 ```
 
@@ -91,7 +102,11 @@ new Flickity(elem, opts)
 
 ## API
 
-Frozen from v2.3.0 — `new Flickity`, `Flickity.data(elem)`, `defaults`, `Cell`, `Slide`, `select/next/previous/destroy/resize/reposition`, events `ready/select/change/settle`, `data-flickity` htmlInit. See upstream docs at https://flickity.metafizzy.co.
+Frozen from v2.3.0 — `new Flickity`, `Flickity.data(elem)` (now `Map`), `defaults`, `Cell`/`Slide` (now `class`), `select/next/previous/destroy/resize/reposition`, events `ready/select/change/settle`, `data-flickity` htmlInit. `lazyLoad` now `IntersectionObserver(root: viewport)` + `loading=lazy`/`decoding=async` (single bulk read at `activate`, no per-`select` QSA). Drag `pointerMove` coalesced via `scheduler.mutate` (one `transform` per `rAF`). See upstream docs at https://flickity.metafizzy.co.
+
+## Performance
+
+`PERFORMANCE_GUIDE.md` Part I (DOM) dominates: batch via `DocumentFragment`, `measure`/`mutate` `rAF` (reads→writes), `Map` instances (no `delete` deopt), shape-stable ctors (V8 hidden classes), hoisted `modulo`/bound `animate`. Measure reflows with Chrome Performance, not micro-benchmarks.
 
 ## License
 

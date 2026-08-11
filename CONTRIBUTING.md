@@ -35,10 +35,10 @@ You'll also need Playwright Chromium for the API harness (installed below).
 ```sh
 git clone https://github.com/oreoorbitz/flickity-mepto.git
 cd flickity-mepto
-npm ci                      # install deps (vite, @babel/*, eslint, playwright, esbuild, terser)
+npm ci                      # install deps (vite, @babel/* + @rollup/plugin-babel, eslint, playwright, esbuild, terser)
 npx playwright install --with-deps chromium   # one-time: browser for harness
-npm run build               # clean && vite build (ESM+IIFE 79K/81K) && vite.min (59K/45K)
-npm run dev                 # watch mode: vite build --watch
+npm run build               # clean && vite build (ESM+IIFE ~90K/93K) && vite.min (~70K/52K, 14.8K gzip, Babel last 3)
+npm run dev                 # watch mode: vite build --watch (esnext→Babel)
 ```
 
 > **No build step is needed for the API harness itself** — `test/flickity-api.html` loads `dist/flickity.pkgd.js` (built once) and `mepto` from `test/mepto.js` (bundled from `meptos/src/mepto.ts`). For manual visual check, open `test/flickity-api.html` in browser — `<pre id="results">` shows PASS/FAIL.
@@ -88,8 +88,8 @@ npx prettier --check "src/**/*.{js,json,md}" "test/**/*.{js,html}"
 ## Pull request checklist
 
 - [ ] `nvm use` (Node 22)
-- [ ] `npm run build` exits 0, `dist/*.js` 79K/81K → 59K/45K min present, banner `/*! Flickity PACKAGED v2.3.0-mepto`
-- [ ] `npm test` — all 7 groups `PASS` (Playwright `file://`)
+- [ ] `npm run build` exits 0, `dist/*.js` ~90K/~93K → ~70K/~52K min present (14.8K gzip), banner `/*! Flickity PACKAGED v2.3.0-mepto`
+- [ ] `npm test` — all 7 groups `PASS` (30 checks, Playwright `file://`, `test/flickity-api.html`)
 - [ ] No `src-orig/` / `README.upstream.md` edits (verbatim upstream)
 - [ ] Mepto APIs used via `window.mepto || window.jQuery` fallback, `setMepto` alias preserved
 - [ ] No client store names in `README.md` / `src/` / messages (whiteout check: `grep -r <store-name>`)

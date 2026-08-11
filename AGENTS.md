@@ -26,8 +26,8 @@ Do not guess past the router — open the doc. `AGENTS.md` stays short by design
 ## Minimal verify loop (no build needed for API harness, build for dist)
 
 ```bash
-npm run build          # Vite ESM+IIFE + min (79K/81K → 59K/45K), needs Node 22
-npx playwright test test/flickity-api.spec.js --project=chromium  # API harness, ~1s, file://, 7 groups
+npm run build          # Vite esnext + @rollup/plugin-babel (last 3) → ESM+IIFE ~90K/93K → ~70K/52K min (14.8K gzip), needs Node 22
+npx playwright test test/flickity-api.spec.js --project=chromium  # API harness, ~1s, file://, 7 groups (30 checks)
 npm test               # alias to playwright test --reporter=list
 ```
 
@@ -54,6 +54,6 @@ npm test               # alias to playwright test --reporter=list
 
 ## Quick references
 
-- **Browser target:** evergreen only. Use `WeakMap`, `WeakSet`, `requestAnimationFrame`, `classList`, `closest`, `CustomEvent` freely. Mepto provides `$.bridget`, `$.data`/`$.removeData` (WeakMap), `$.Event`, `$.batch`, `$.raf`/`$.measure`/`$.mutate`.
-- **Current task:** Mepto APIs (`$.bridget`, WeakMap data, `$.Event`/`trigger` 2-arg, `$.batch`, `$.raf`) are implemented in `Mepto/src/mepto.ts` and consumed via `window.mepto || window.jQuery` fallback in `src/flickity.js`. Verify via `test/flickity-api.html` before/after Mepto changes.
-- **Perf:** `PERFORMANCE_GUIDE.md` (consolidated) — Part I DOM (batching, rAF, thrashing) dominates, Part II V8 JIT only for hot internals. Measure reflows, not micro-optimizations.
+- **Browser target:** evergreen only, Babel `last 3 versions` (esnext→transpiled). Use `WeakMap`/`Map`, `IntersectionObserver`, `requestAnimationFrame`, `classList`, `closest`, `CustomEvent` freely. Mepto provides `$.bridget`, `$.data`/`$.removeData` (WeakMap), `$.Event`, `$.batch`.
+- **Current task:** Mepto APIs consumed via `window.mepto || window.jQuery` in `src/flickity.js`. Perf now via `src/scheduler.js` (`measure`/`mutate` rAF), `Map` instances, shape-stable ctors, `IntersectionObserver(root:viewport)` lazyLoad (single QSA at `activate`), drag `pointerMove` coalesced. Verify via `test/flickity-api.html` before/after.
+- **Perf:** `PERFORMANCE_GUIDE.md` (consolidated) — Part I DOM (batching, rAF, thrashing) dominates, Part II V8 JIT only for hot internals. Measure reflows, not micro-optimizations. `lazyLoad` is IO, not per-`select` QSA.
