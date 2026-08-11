@@ -1,191 +1,137 @@
-// animate
-;(function (window, factory) {
-  // universal module definition
-  if (typeof define == 'function' && define.amd) {
-    // AMD
-    define(['fizzy-ui-utils/utils'], function (utils) {
-      return factory(window, utils)
-    })
-  } else if (typeof module == 'object' && module.exports) {
-    // CommonJS
-    module.exports = factory(window, require('fizzy-ui-utils'))
-  } else {
-    // browser global
-    window.Flickity = window.Flickity || {}
-    window.Flickity.animatePrototype = factory(window, window.fizzyUIUtils)
-  }
-})(window, function factory(window, utils) {
-  'use strict'
+import utils from 'fizzy-ui-utils';
 
-  // -------------------------- animate -------------------------- //
+export const animatePrototype = {
+  startAnimation() {
+    if (this.isAnimating) return;
+    this.isAnimating = true;
+    this.restingFrames = 0;
+    this.animate();
+  },
 
-  var proto = {}
+  animate() {
+    this.applyDragForce();
+    this.applySelectedAttraction();
 
-  proto.startAnimation = function () {
+    const previousX = this.x;
+
+    this.integratePhysics();
+    this.positionSlider();
+    this.settle(previousX);
+
     if (this.isAnimating) {
-      return
+      requestAnimationFrame(() => this.animate());
     }
+  },
 
-    this.isAnimating = true
-    this.restingFrames = 0
-    this.animate()
-  }
-
-  proto.animate = function () {
-    this.applyDragForce()
-    this.applySelectedAttraction()
-
-    var previousX = this.x
-
-    this.integratePhysics()
-    this.positionSlider()
-    this.settle(previousX)
-    // animate next frame
-    if (this.isAnimating) {
-      var _this = this
-      requestAnimationFrame(function animateFrame() {
-        _this.animate()
-      })
-    }
-  }
-
-  proto.positionSlider = function () {
-    var x = this.x
-    // wrap position around
+  positionSlider() {
+    let x = this.x;
     if (this.options.wrapAround && this.cells.length > 1) {
-      x = utils.modulo(x, this.slideableWidth)
-      x -= this.slideableWidth
-      this.shiftWrapCells(x)
+      x = utils.modulo(x, this.slideableWidth);
+      x -= this.slideableWidth;
+      this.shiftWrapCells(x);
     }
+    this.setTranslateX(x, this.isAnimating);
+    this.dispatchScrollEvent();
+  },
 
-    this.setTranslateX(x, this.isAnimating)
-    this.dispatchScrollEvent()
-  }
-
-  proto.setTranslateX = function (x, is3d) {
-    x += this.cursorPosition
-    // reverse if right-to-left and using transform
-    x = this.options.rightToLeft ? -x : x
-    var translateX = this.getPositionValue(x)
-    // use 3D transforms for hardware acceleration on iOS
-    // but use 2D when settled, for better font-rendering
+  setTranslateX(x, is3d) {
+    x += this.cursorPosition;
+    x = this.options.rightToLeft ? -x : x;
+    const translateX = this.getPositionValue(x);
     this.slider.style.transform = is3d
-      ? 'translate3d(' + translateX + ',0,0)'
-      : 'translateX(' + translateX + ')'
-  }
+      ? `translate3d(${translateX},0,0)`
+      : `translateX(${translateX})`;
+  },
 
-  proto.dispatchScrollEvent = function () {
-    var firstSlide = this.slides[0]
-    if (!firstSlide) {
-      return
-    }
-    var positionX = -this.x - firstSlide.target
-    var progress = positionX / this.slidesWidth
-    this.dispatchEvent('scroll', null, [progress, positionX])
-  }
+  dispatchScrollEvent() {
+    const firstSlide = this.slides[0];
+    if (!firstSlide) return;
+    const positionX = -this.x - firstSlide.target;
+    const progress = positionX / this.slidesWidth;
+    this.dispatchEvent('scroll', null, [progress, positionX]);
+  },
 
-  proto.positionSliderAtSelected = function () {
-    if (!this.cells.length) {
-      return
-    }
-    this.x = -this.selectedSlide.target
-    this.velocity = 0 // stop wobble
-    this.positionSlider()
-  }
+  positionSliderAtSelected() {
+    if (!this.cells.length) return;
+    this.x = -this.selectedSlide.target;
+    this.velocity = 0;
+    this.positionSlider();
+  },
 
-  proto.getPositionValue = function (position) {
+  getPositionValue(position) {
     if (this.options.percentPosition) {
-      // percent position, round to 2 digits, like 12.34%
-      return Math.round((position / this.size.innerWidth) * 10000) * 0.01 + '%'
-    } else {
-      // pixel positioning
-      return Math.round(position) + 'px'
+      return `${Math.round((position / this.size.innerWidth) * 10000) * 0.01}%`;
     }
-  }
+    return `${Math.round(position)}px`;
+  },
 
-  proto.settle = function (previousX) {
-    // keep track of frames where x hasn't moved
-    var isResting = !this.isPointerDown && Math.round(this.x * 100) == Math.round(previousX * 100)
-    if (isResting) {
-      this.restingFrames++
-    }
-    // stop animating if resting for 3 or more frames
+  settle(previousX) {
+    const isResting =
+      !this.isPointerDown && Math.round(this.x * 100) === Math.round(previousX * 100);
+    if (isResting) this.restingFrames++;
     if (this.restingFrames > 2) {
-      this.isAnimating = false
-      delete this.isFreeScrolling
-      // render position with translateX when settled
-      this.positionSlider()
-      this.dispatchEvent('settle', null, [this.selectedIndex])
+      this.isAnimating = false;
+      delete this.isFreeScrolling;
+      this.positionSlider();
+      this.dispatchEvent('settle', null, [this.selectedIndex]);
     }
-  }
+  },
 
-  proto.shiftWrapCells = function (x) {
-    // shift before cells
-    var beforeGap = this.cursorPosition + x
-    this._shiftCells(this.beforeShiftCells, beforeGap, -1)
-    // shift after cells
-    var afterGap = this.size.innerWidth - (x + this.slideableWidth + this.cursorPosition)
-    this._shiftCells(this.afterShiftCells, afterGap, 1)
-  }
+  shiftWrapCells(x) {
+    const beforeGap = this.cursorPosition + x;
+    this._shiftCells(this.beforeShiftCells, beforeGap, -1);
+    const afterGap = this.size.innerWidth - (x + this.slideableWidth + this.cursorPosition);
+    this._shiftCells(this.afterShiftCells, afterGap, 1);
+  },
 
-  proto._shiftCells = function (cells, gap, shift) {
-    for (var i = 0; i < cells.length; i++) {
-      var cell = cells[i]
-      var cellShift = gap > 0 ? shift : 0
-      cell.wrapShift(cellShift)
-      gap -= cell.size.outerWidth
+  _shiftCells(cells, gap, shift) {
+    for (let i = 0; i < (cells?.length ?? 0); i++) {
+      const cell = cells[i];
+      const cellShift = gap > 0 ? shift : 0;
+      cell.wrapShift(cellShift);
+      gap -= cell.size.outerWidth;
     }
-  }
+  },
 
-  proto._unshiftCells = function (cells) {
-    if (!cells || !cells.length) {
-      return
+  _unshiftCells(cells) {
+    if (!cells?.length) return;
+    for (let i = 0; i < cells.length; i++) {
+      cells[i].wrapShift(0);
     }
-    for (var i = 0; i < cells.length; i++) {
-      cells[i].wrapShift(0)
-    }
-  }
+  },
 
-  // -------------------------- physics -------------------------- //
+  // physics
+  integratePhysics() {
+    this.x += this.velocity;
+    this.velocity *= this.getFrictionFactor();
+  },
 
-  proto.integratePhysics = function () {
-    this.x += this.velocity
-    this.velocity *= this.getFrictionFactor()
-  }
+  applyForce(force) {
+    this.velocity += force;
+  },
 
-  proto.applyForce = function (force) {
-    this.velocity += force
-  }
+  getFrictionFactor() {
+    return 1 - this.options[this.isFreeScrolling ? 'freeScrollFriction' : 'friction'];
+  },
 
-  proto.getFrictionFactor = function () {
-    return 1 - this.options[this.isFreeScrolling ? 'freeScrollFriction' : 'friction']
-  }
+  getRestingPosition() {
+    return this.x + this.velocity / (1 - this.getFrictionFactor());
+  },
 
-  proto.getRestingPosition = function () {
-    // my thanks to Steven Wittens, who simplified this math greatly
-    return this.x + this.velocity / (1 - this.getFrictionFactor())
-  }
+  applyDragForce() {
+    if (!this.isDraggable || !this.isPointerDown) return;
+    const dragVelocity = this.dragX - this.x;
+    const dragForce = dragVelocity - this.velocity;
+    this.applyForce(dragForce);
+  },
 
-  proto.applyDragForce = function () {
-    if (!this.isDraggable || !this.isPointerDown) {
-      return
-    }
-    // change the position to drag position by applying force
-    var dragVelocity = this.dragX - this.x
-    var dragForce = dragVelocity - this.velocity
-    this.applyForce(dragForce)
-  }
+  applySelectedAttraction() {
+    const dragDown = this.isDraggable && this.isPointerDown;
+    if (dragDown || this.isFreeScrolling || !this.slides.length) return;
+    const distance = this.selectedSlide.target * -1 - this.x;
+    const force = distance * this.options.selectedAttraction;
+    this.applyForce(force);
+  },
+};
 
-  proto.applySelectedAttraction = function () {
-    // do not attract if pointer down or no slides
-    var dragDown = this.isDraggable && this.isPointerDown
-    if (dragDown || this.isFreeScrolling || !this.slides.length) {
-      return
-    }
-    var distance = this.selectedSlide.target * -1 - this.x
-    var force = distance * this.options.selectedAttraction
-    this.applyForce(force)
-  }
-
-  return proto
-})
+export default animatePrototype;

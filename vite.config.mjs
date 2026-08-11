@@ -1,7 +1,9 @@
 import fs from 'fs'
 import { resolve } from 'path'
+import { babel } from '@rollup/plugin-babel'
 // Flickity-Mepto build: ESM + IIFE pkgd, mepto external (theme loads mepto separately)
 // Keeps Flickity API identical to v2.3.0 PACKAGED, but without jquery-bridget UMD weight.
+// Source is cutting-edge ESM (ES2024); Babel transpiles to last 3 versions.
 const pkg = JSON.parse(fs.readFileSync('./package.json', 'utf8'))
 const banner = `/*! Flickity PACKAGED v2.3.0-mepto (${pkg.version}) — Mepto-integrated, jQuery-free */\n`
 
@@ -15,7 +17,7 @@ export default {
     },
     outDir: 'dist',
     emptyOutDir: false,
-    target: ['es2018', 'chrome87', 'firefox78', 'safari14'],
+    target: 'esnext',
     cssCodeSplit: false,
     rollupOptions: {
       external: ['mepto', 'jquery'],
@@ -24,6 +26,13 @@ export default {
         globals: { mepto: 'mepto', jquery: 'jQuery' },
         assetFileNames: 'flickity.[ext]',
       },
+      plugins: [
+        babel({
+          babelHelpers: 'bundled',
+          extensions: ['.js'],
+          exclude: /node_modules/,
+        }),
+      ],
     },
     minify: false,
   },
