@@ -3,7 +3,7 @@ import utils from 'fizzy-ui-utils';
 
 const getCellsFragment = (cells) => {
   const fragment = document.createDocumentFragment();
-  cells.forEach((cell) => fragment.appendChild(cell.element));
+  for (let i = 0; i < cells.length; i++) fragment.appendChild(cells[i].element);
   return fragment;
 };
 
@@ -43,12 +43,13 @@ proto.remove = function (elems) {
   const cells = this.getCells(elems);
   if (!cells?.length) return;
   let minCellIndex = this.cells.length - 1;
-  cells.forEach((cell) => {
+  for (let i = 0; i < cells.length; i++) {
+    const cell = cells[i];
     cell.remove();
     const index = this.cells.indexOf(cell);
-    minCellIndex = Math.min(index, minCellIndex);
+    if (index < minCellIndex) minCellIndex = index;
     utils.removeFrom(this.cells, cell);
-  }, this);
+  }
   this.cellChange(minCellIndex, true);
 };
 

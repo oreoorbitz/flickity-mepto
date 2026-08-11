@@ -54,7 +54,7 @@ class PageDots extends Unipointer {
 
   removeDots(count) {
     const removeDots = this.dots.splice(this.dots.length - count, count);
-    removeDots.forEach((dot) => this.holder.removeChild(dot));
+    for (let i = 0; i < removeDots.length; i++) this.holder.removeChild(removeDots[i]);
   }
 
   updateSelected() {

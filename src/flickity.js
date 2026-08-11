@@ -12,12 +12,22 @@ const getComputedStyle = G.getComputedStyle?.bind(G) ?? (() => ({ content: '' })
 const consoleObj = G.console;
 
 const moveElements = (elems, toElem) => {
-  elems = utils.makeArray(elems);
-  while (elems.length) toElem.appendChild(elems.shift());
+  // batch via Fragment — avoids N reflows from appendChild in loop (Part I §2)
+  const arr = utils.makeArray(elems);
+  if (!arr.length) return;
+  // use Fragment when moving multiple; single append is cheaper without fragment
+  if (arr.length === 1) {
+    toElem.appendChild(arr[0]);
+    return;
+  }
+  const frag = document.createDocumentFragment();
+  for (let i = 0; i < arr.length; i++) frag.appendChild(arr[i]);
+  toElem.appendChild(frag);
 };
 
 let GUID = 0;
-const instances = {};
+// Map over plain object — avoids `delete` deopt and keeps numeric + string keys stable (Part II Rule 3/10)
+const instances = new Map();
 
 export default class Flickity extends EvEmitter {
   constructor(element, options) {
@@ -29,10 +39,42 @@ export default class Flickity extends EvEmitter {
     }
     this.element = queryElement;
     if (this.element.flickityGUID) {
-      const instance = instances[this.element.flickityGUID];
-      if (instance) instance.option(options);
-      return instance;
+      const instance = instances.get(this.element.flickityGUID);
+      if (instance) {
+        instance.option(options);
+        return instance;
+      }
     }
+
+    // shape-stable initialization — all properties in fixed order (Part II Rule 1)
+    this.guid = 0;
+    this.isActive = false;
+    this.isInitActivated = false;
+    this.isAnimating = false;
+    this.isPointerDown = false;
+    this.isFreeScrolling = false;
+    this.isDraggable = false;
+    this.isEnabled = true;
+    this.selectedIndex = 0;
+    this.restingFrames = 0;
+    this.x = 0;
+    this.velocity = 0;
+    this.cursorPosition = 0;
+    this.originSide = '';
+    this.viewport = null;
+    this.slider = null;
+    this.cells = [];
+    this.slides = [];
+    this.selectedSlide = null;
+    this.size = null;
+    this.maxCellHeight = 0;
+    this.slideableWidth = 0;
+    this.slidesWidth = 0;
+    this.beforeShiftCells = [];
+    this.afterShiftCells = [];
+    this._boundAnimate = null;
+    this._boundOnResize = null;
+    this.$element = null;
 
     if (jQuery) {
       try {
@@ -77,7 +119,7 @@ export default class Flickity extends EvEmitter {
   static data(elem) {
     elem = utils.getQueryElement(elem);
     const id = elem?.flickityGUID;
-    return id ? instances[id] : null;
+    return id ? instances.get(id) ?? null : null;
   }
 
   static setJQuery(jq) {
@@ -93,26 +135,28 @@ export default class Flickity extends EvEmitter {
   _create() {
     const id = (this.guid = ++GUID);
     this.element.flickityGUID = id;
-    instances[id] = this;
-    this.selectedIndex = 0;
-    this.restingFrames = 0;
-    this.x = 0;
-    this.velocity = 0;
+    instances.set(id, this);
+    // keep shape — reassign in same order as ctor; avoid conditional adds
     this.originSide = this.options.rightToLeft ? 'right' : 'left';
     this.viewport = document.createElement('div');
     this.viewport.className = 'flickity-viewport';
     this._createSlider();
 
     if (this.options.resize || this.options.watchCSS) {
+      // resize is infrequent; passive not needed but handleEvent pattern used
       G.addEventListener('resize', this);
     }
 
-    for (const eventName in this.options.on ?? {}) {
-      const listener = this.options.on[eventName];
-      this.on(eventName, listener);
+    const onMap = this.options.on;
+    if (onMap) {
+      for (const eventName in onMap) {
+        const listener = onMap[eventName];
+        if (listener) this.on(eventName, listener);
+      }
     }
 
-    Flickity.createMethods.forEach((method) => this[method]());
+    // avoid per-instance closure allocation — classic for (Part II Rule 27)
+    for (let i = 0; i < Flickity.createMethods.length; i++) this[Flickity.createMethods[i]]();
 
     if (this.options.watchCSS) this.watchCSS();
     else this.activate();
@@ -200,7 +244,8 @@ export default class Flickity extends EvEmitter {
   }
 
   _sizeCells(cells) {
-    cells.forEach((cell) => cell.getSize());
+    // separate read phase — batch all getSize before any writes (Part I §3)
+    for (let i = 0; i < cells.length; i++) cells[i].getSize();
   }
 
   updateSlides() {
@@ -213,10 +258,11 @@ export default class Flickity extends EvEmitter {
     const nextMargin = isOriginLeft ? 'marginRight' : 'marginLeft';
     const canCellFit = this._getCanCellFit();
 
-    this.cells.forEach((cell, i) => {
+    for (let i = 0; i < this.cells.length; i++) {
+      const cell = this.cells[i];
       if (!slide.cells.length) {
         slide.addCell(cell);
-        return;
+        continue;
       }
       const slideWidth =
         slide.outerWidth - slide.firstMargin + (cell.size.outerWidth - cell.size[nextMargin]);
@@ -228,7 +274,7 @@ export default class Flickity extends EvEmitter {
         this.slides.push(slide);
         slide.addCell(cell);
       }
-    });
+    }
     slide.updateTarget();
     this.updateSelectedSlide();
   }
@@ -310,14 +356,15 @@ export default class Flickity extends EvEmitter {
     const isContentSmaller = contentWidth < this.size.innerWidth;
     const beginBound = this.cursorPosition + (this.cells[0]?.size[beginMargin] ?? 0);
     const endBound = contentWidth - this.size.innerWidth * (1 - this.cellAlign);
-    this.slides.forEach((slide) => {
+    for (let i = 0; i < this.slides.length; i++) {
+      const slide = this.slides[i];
       if (isContentSmaller) {
         slide.target = contentWidth * this.cellAlign;
       } else {
         slide.target = Math.max(slide.target, beginBound);
         slide.target = Math.min(slide.target, endBound);
       }
-    });
+    }
   }
 
   dispatchEvent(type, event, args) {
@@ -455,10 +502,10 @@ export default class Flickity extends EvEmitter {
   getCells(elems) {
     elems = utils.makeArray(elems);
     const cells = [];
-    elems.forEach((elem) => {
-      const cell = this.getCell(elem);
+    for (let i = 0; i < elems.length; i++) {
+      const cell = this.getCell(elems[i]);
       if (cell) cells.push(cell);
-    });
+    }
     return cells;
   }
 
@@ -546,7 +593,7 @@ export default class Flickity extends EvEmitter {
     if (!this.isActive) return;
     this.element.classList.remove('flickity-enabled', 'flickity-rtl');
     this.unselectSelectedSlide();
-    this.cells.forEach((cell) => cell.destroy());
+    for (let i = 0; i < this.cells.length; i++) this.cells[i].destroy();
     this.element.removeChild(this.viewport);
     moveElements(this.slider.children, this.element);
     if (this.options.accessibility) {
@@ -566,8 +613,18 @@ export default class Flickity extends EvEmitter {
       const jq = G.mepto ?? G.jQuery ?? G.$ ?? jQuery;
       if (jq?.removeData) jq.removeData(this.element, 'flickity');
     } catch (_) {}
-    delete this.element.flickityGUID;
-    delete instances[this.guid];
+    // avoid `delete` deopt — assign undefined, then remove attribute (Part II Rule 3)
+    this.element.flickityGUID = undefined;
+    try {
+      delete this.element.flickityGUID;
+    } catch (_) {}
+    instances.delete(this.guid);
+    // clear references for GC (Part I §7)
+    this.cells.length = 0;
+    this.slides.length = 0;
+    this.viewport = null;
+    this.slider = null;
+    this.size = null;
   }
 
   handleEvent = utils.handleEvent;

@@ -8,10 +8,13 @@ export default class Cell {
   }
 
   create() {
-    this.element.style.position = 'absolute';
-    this.element.setAttribute('aria-hidden', 'true');
+    // shape-stable: init all ever-used props in fixed order (Part II Rule 1)
     this.x = 0;
     this.shift = 0;
+    this.size = null;
+    this.target = 0;
+    this.element.style.position = 'absolute';
+    this.element.setAttribute('aria-hidden', 'true');
     this.element.style[this.parent.originSide] = 0;
   }
 

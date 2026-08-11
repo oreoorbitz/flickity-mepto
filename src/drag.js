@@ -53,7 +53,7 @@ proto.unbindDrag = function () {
 };
 
 proto._uiChangeDrag = function () {
-  delete this.isFreeScrolling;
+  this.isFreeScrolling = undefined;
 };
 
 proto.pointerDown = function (event, pointer) {
@@ -68,7 +68,7 @@ proto.pointerDown = function (event, pointer) {
   this.dragX = this.x;
   this.viewport.classList.add('is-pointer-down');
   this.pointerDownScroll = getScrollPosition();
-  G.addEventListener('scroll', this);
+  G.addEventListener('scroll', this, { passive: true });
   this._pointerDownDefault(event, pointer);
 };
 
@@ -97,7 +97,7 @@ proto.hasDragStarted = function (moveVector) {
 };
 
 proto.pointerUp = function (event, pointer) {
-  delete this.isTouchScrolling;
+  this.isTouchScrolling = undefined;
   this.viewport.classList.remove('is-pointer-down');
   this.dispatchEvent('pointerUp', event, [pointer]);
   this._dragPointerUp(event, pointer);
@@ -105,7 +105,7 @@ proto.pointerUp = function (event, pointer) {
 
 proto.pointerDone = function () {
   G.removeEventListener('scroll', this);
-  delete this.pointerDownScroll;
+  this.pointerDownScroll = undefined;
 };
 
 proto.dragStart = function (event, pointer) {

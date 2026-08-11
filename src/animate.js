@@ -1,10 +1,15 @@
 import utils from 'fizzy-ui-utils';
 
+// hoisted for hot loop (Part II Rule 27) — avoid property lookup per frame
+const modulo = utils.modulo;
+
 export const animatePrototype = {
   startAnimation() {
     if (this.isAnimating) return;
     this.isAnimating = true;
     this.restingFrames = 0;
+    // bind once, reuse per frame — avoids arrow closure allocation (Part II Rule 28)
+    this._boundAnimate ??= this.animate.bind(this);
     this.animate();
   },
 
@@ -19,14 +24,14 @@ export const animatePrototype = {
     this.settle(previousX);
 
     if (this.isAnimating) {
-      requestAnimationFrame(() => this.animate());
+      requestAnimationFrame(this._boundAnimate);
     }
   },
 
   positionSlider() {
     let x = this.x;
     if (this.options.wrapAround && this.cells.length > 1) {
-      x = utils.modulo(x, this.slideableWidth);
+      x = modulo(x, this.slideableWidth);
       x -= this.slideableWidth;
       this.shiftWrapCells(x);
     }
@@ -71,7 +76,7 @@ export const animatePrototype = {
     if (isResting) this.restingFrames++;
     if (this.restingFrames > 2) {
       this.isAnimating = false;
-      delete this.isFreeScrolling;
+      this.isFreeScrolling = undefined;
       this.positionSlider();
       this.dispatchEvent('settle', null, [this.selectedIndex]);
     }

@@ -1,10 +1,14 @@
 export default class Slide {
   constructor(parent) {
+    // shape-stable order (Part II Rule 1) — x/firstMargin/target initialized here
     this.parent = parent;
     this.isOriginLeft = parent.originSide === 'left';
     this.cells = [];
     this.outerWidth = 0;
     this.height = 0;
+    this.x = 0;
+    this.firstMargin = 0;
+    this.target = 0;
   }
 
   addCell(cell) {
@@ -31,11 +35,11 @@ export default class Slide {
   }
 
   select() {
-    this.cells.forEach((cell) => cell.select());
+    for (let i = 0; i < this.cells.length; i++) this.cells[i].select();
   }
 
   unselect() {
-    this.cells.forEach((cell) => cell.unselect());
+    for (let i = 0; i < this.cells.length; i++) this.cells[i].unselect();
   }
 
   getCellElements() {
