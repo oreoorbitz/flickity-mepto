@@ -1,6 +1,7 @@
 import Flickity from './flickity.js';
 import Unidragger from 'unidragger';
 import utils from 'fizzy-ui-utils';
+import { mutate } from './scheduler.js';
 
 const G = globalThis;
 
@@ -119,11 +120,23 @@ proto.dragStart = function (event, pointer) {
 proto.pointerMove = function (event, pointer) {
   const moveVector = this._dragPointerMove(event, pointer);
   this.dispatchEvent('pointerMove', event, [pointer, moveVector]);
-  this._dragMove(event, pointer, moveVector);
+  // coalesce multiple pointerMoves per frame — one mutate per rAF (Part I §4)
+  this._pendingDrag = { event, pointer, moveVector };
+  if (!this._dragRaf) {
+    this._dragRaf = 1;
+    const self = this;
+    mutate(() => {
+      self._dragRaf = 0;
+      const p = self._pendingDrag;
+      self._pendingDrag = null;
+      if (p) self._dragMove(p.event, p.pointer, p.moveVector);
+    });
+  }
 };
 
 proto.dragMove = function (event, pointer, moveVector) {
   if (!this.isDraggable) return;
+  // preventDefault must stay sync for touch — do here, state update in mutate already coalesced
   event.preventDefault();
   this.previousDragX = this.dragX;
   const direction = this.options.rightToLeft ? -1 : 1;
@@ -136,7 +149,7 @@ proto.dragMove = function (event, pointer, moveVector) {
     dragX = dragX < endBound ? (dragX + endBound) * 0.5 : dragX;
   }
   this.dragX = dragX;
-  this.dragMoveTime = new Date();
+  this.dragMoveTime = Date.now();
   this.dispatchEvent('dragMove', event, [pointer, moveVector]);
 };
 
