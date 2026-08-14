@@ -1,7 +1,7 @@
 (() => {
-  // node_modules/meptos/src/mepto.ts
+  // ../Mepto/src/mepto.ts
   var mepto = (function() {
-    let $ = void 0;
+    let $ = {};
     const emptyArray = [];
     const filter = Array.prototype.filter;
     const slice = Array.prototype.slice;
@@ -60,7 +60,11 @@
     const isArray = Array.isArray;
     mepto2.matches = function(element, selector) {
       if (!selector || !element || element.nodeType !== 1) return false;
-      return element.matches(selector);
+      try {
+        return element.matches(selector);
+      } catch {
+        return false;
+      }
     };
     function type(obj) {
       if (obj === null) return "null";
@@ -211,17 +215,19 @@
     };
     mepto2.fragment = function(html, name, properties) {
       let dom;
-      const singleMatch = singleTagRE.exec(html);
+      let htmlContent = html;
+      let effectiveName = name;
+      const singleMatch = singleTagRE.exec(htmlContent);
       if (singleMatch) {
         dom = [document.createElement(singleMatch[1])];
       } else {
-        html = html.replace(tagExpanderRE, "<$1></$2>");
-        if (name === void 0) {
-          const fragMatch = fragmentRE.exec(html);
-          name = fragMatch ? fragMatch[1] : void 0;
+        htmlContent = htmlContent.replace(tagExpanderRE, "<$1></$2>");
+        if (effectiveName === void 0) {
+          const fragMatch = fragmentRE.exec(htmlContent);
+          effectiveName = fragMatch ? fragMatch[1] : void 0;
         }
-        const container = getContainer(name);
-        setInnerHTML(container, html);
+        const container = getContainer(effectiveName);
+        setInnerHTML(container, htmlContent);
         const childNodes = slice.call(container.childNodes);
         dom = $.each(childNodes, function() {
           container.removeChild(this);
@@ -259,7 +265,11 @@
         finalSelector = str;
         const fragMatch = str[0] === "<" ? fragmentRE.exec(str) : null;
         if (fragMatch) {
-          dom = mepto2.fragment(str, fragMatch[1], context);
+          dom = mepto2.fragment(
+            str,
+            fragMatch[1],
+            context
+          );
           finalSelector = null;
         } else if (context !== void 0) {
           return $(context).find(str);
@@ -334,17 +344,26 @@
       const maybeClass = !maybeID && selector[0] === ".";
       const nameOnly = maybeID || maybeClass ? selector.slice(1) : selector;
       const isSimple = simpleSelectorRE.test(nameOnly);
-      if (maybeID && isSimple && element instanceof Document) {
-        const found = element.getElementById(nameOnly);
-        return found ? [found] : [];
+      if (maybeID && isSimple) {
+        if ("getElementById" in element) {
+          const found = element.getElementById(nameOnly);
+          if (found && element instanceof Element && !element.contains(found)) return [];
+          return found ? [found] : [];
+        }
       }
       const nodeType = element.nodeType;
       if (nodeType !== 1 && nodeType !== 9 && nodeType !== 11) {
         return [];
       }
-      if (isSimple && !maybeID && element instanceof Element) {
-        const results = maybeClass ? element.getElementsByClassName(nameOnly) : element.getElementsByTagName(selector);
-        return slice.call(results);
+      if (isSimple && !maybeID) {
+        if (maybeClass && "getElementsByClassName" in element) {
+          const results = element.getElementsByClassName(nameOnly);
+          return slice.call(results);
+        }
+        if (!maybeClass && "getElementsByTagName" in element) {
+          const results = element.getElementsByTagName(selector);
+          return slice.call(results);
+        }
       }
       return slice.call(element.querySelectorAll(selector));
     };
@@ -361,9 +380,30 @@
     };
     mepto2.getElementById = function(id, context) {
       const root = context || document;
-      if (!(root instanceof Document)) return $();
+      if (!("getElementById" in root)) return $();
       const found = root.getElementById(id);
+      if (found && root instanceof Element && !root.contains(found))
+        return $();
       return found ? $([found]) : $();
+    };
+    mepto2.findFast = function(selector, context) {
+      const root = context || document;
+      const s = selector.trim();
+      if (/^#[\w-]+$/.test(s) && "getElementById" in root) {
+        const found = root.getElementById(s.slice(1));
+        if (found && root instanceof Element && !root.contains(found))
+          return $();
+        return found ? $([found]) : $();
+      }
+      if (/^\.[\w-]+$/.test(s) && "getElementsByClassName" in root) {
+        const els = root.getElementsByClassName(s.slice(1));
+        return $(slice.call(els));
+      }
+      if (/^[a-zA-Z][\w-]*$/.test(s) && "getElementsByTagName" in root) {
+        const els = root.getElementsByTagName(s);
+        return $(slice.call(els));
+      }
+      return $(slice.call(root.querySelectorAll(s)));
     };
     function filtered(nodes, selector) {
       if (selector == null) return $(nodes);
@@ -377,7 +417,7 @@
     }
     function className(node, value) {
       const klass = node?.className;
-      const svg = klass && typeof klass === "object" && "baseVal" in klass;
+      const svg = !!klass && typeof klass === "object" && "baseVal" in klass;
       if (value === void 0) {
         return svg ? klass.baseVal : klass;
       }
@@ -516,7 +556,9 @@
        * @returns A new plain array containing all merged elements.
        */
       concat(...args) {
-        const flattened = args.map((arg) => mepto2.isZ(arg) ? arg.toArray() : arg);
+        const flattened = args.map(
+          (arg) => mepto2.isZ(arg) ? arg.toArray() : arg
+        );
         return emptyArray.concat(mepto2.isZ(this) ? this.toArray() : this, ...flattened);
       },
       // `map` and `slice` follow jQuery conventions, not Array.prototype:
@@ -589,7 +631,18 @@
        */
       filter(selector) {
         if (selector == null) return $();
-        const predicate = isFunction(selector) ? (el, i) => selector.call(el, i, el) : (el) => mepto2.matches(el, selector);
+        let predicate;
+        if (isFunction(selector)) {
+          predicate = (el, i) => selector.call(el, i, el);
+        } else if (selector[0] === "." && simpleSelectorRE.test(selector.slice(1))) {
+          const cls = selector.slice(1);
+          predicate = (el) => el.classList.contains(cls);
+        } else if (simpleSelectorRE.test(selector) && /^[a-zA-Z][\w-]*$/.test(selector)) {
+          const tag = selector.toUpperCase();
+          predicate = (el) => el.tagName === tag;
+        } else {
+          predicate = (el) => mepto2.matches(el, selector);
+        }
         const result = [];
         for (let i = 0, len = this.length; i < len; i++) {
           const el = this[i];
@@ -841,11 +894,11 @@
       siblings(selector) {
         return filtered(
           this.map((_i, el) => {
+            const parent = el.parentNode;
+            if (!parent) return [];
             const result = [];
-            const kids = children(el.parentNode);
-            for (let i = 0; i < kids.length; i++) {
-              const child = kids[i];
-              if (child !== el) result.push(child);
+            for (let sib = parent.firstElementChild; sib; sib = sib.nextElementSibling) {
+              if (sib !== el) result.push(sib);
             }
             return result;
           }),
@@ -1525,7 +1578,7 @@
       $.fn[dimension] = function(value) {
         let offset, el = this[0];
         if (value === void 0)
-          return isWindow(el) ? el["inner" + dimensionProperty] : isDocument(el) ? el.documentElement["scroll" + dimensionProperty] : (offset = this.offset()) && offset[dimension];
+          return isWindow(el) ? el["inner" + dimensionProperty] : isDocument(el) ? el.documentElement["scroll" + dimensionProperty] : (offset = this.offset(), offset?.[dimension] ?? 0);
         else
           return this.each(function(idx) {
             const $el = $(this);
@@ -1606,6 +1659,149 @@
       };
     });
     mepto2.Z.prototype = Z.prototype = $.fn;
+    $.fn.jquery = "3.7.1";
+    mepto2.jquery = "3.7.1";
+    const elementDataStore = /* @__PURE__ */ new WeakMap();
+    function getDataMap(el) {
+      let m = elementDataStore.get(el);
+      if (!m) {
+        m = /* @__PURE__ */ new Map();
+        elementDataStore.set(el, m);
+      }
+      return m;
+    }
+    ;
+    $.data = function(elem, key, value) {
+      if (typeof elem === "string") elem = document.querySelector(elem);
+      if (!elem || !elem.nodeType) return void 0;
+      if (key === void 0) return elementDataStore.get(elem);
+      if (arguments.length === 3) {
+        getDataMap(elem).set(key, value);
+        return value;
+      }
+      const map = elementDataStore.get(elem);
+      if (map && map.has(key)) return map.get(key);
+      return $(elem).data(key);
+    };
+    $.removeData = function(elem, key) {
+      if (typeof elem === "string") elem = document.querySelector(elem);
+      if (!elem || !elem.nodeType) return;
+      if (key === void 0) elementDataStore.delete(elem);
+      else elementDataStore.get(elem)?.delete(key);
+    };
+    $.Event = function(type2, props) {
+      let e;
+      if (typeof type2 === "string") {
+        e = new CustomEvent(type2, { bubbles: true, cancelable: true });
+      } else {
+        const orig = type2;
+        e = new CustomEvent(orig.type, {
+          bubbles: true,
+          cancelable: true
+        });
+        for (const k in orig) {
+          try {
+            ;
+            e[k] = orig[k];
+          } catch {
+          }
+        }
+      }
+      if (props) Object.assign(e, props);
+      return e;
+    };
+    const _origTrigger = $.fn.trigger;
+    $.fn.trigger = function(event, extra) {
+      const extraArgs = Array.isArray(extra) ? extra : extra !== void 0 ? [extra] : [];
+      if (typeof event === "string") {
+        return _origTrigger.call(this, event, ...extraArgs);
+      }
+      const type2 = event.type;
+      return this.each(function() {
+        const ev = event;
+        ev.__extra = extraArgs;
+        this.dispatchEvent(ev);
+      });
+    };
+    if (!$.bridget) {
+      ;
+      $.bridget = function(namespace, Klass) {
+        const K = Klass;
+        $.fn[namespace] = function(option, ...rest) {
+          if (typeof option === "string") {
+            if (option.charAt(0) === "_") {
+              if (window.console) console.error(namespace + " has no method " + option);
+              return this;
+            }
+            for (let i = 0; i < this.length; i++) {
+              const el = this[i];
+              const inst = K.data ? K.data(el) : $.data(el, namespace);
+              const dataInst = inst || elementDataStore.get(el)?.get(namespace);
+              if (!dataInst) {
+                if (window.console)
+                  console.error(namespace + " not initialized. Cannot call method " + option);
+                continue;
+              }
+              const method = dataInst[option];
+              if (!method) {
+                if (window.console) console.error(namespace + " has no method " + option);
+                continue;
+              }
+              const ret = method.apply(dataInst, rest);
+              if (ret !== void 0 && ret !== dataInst) return ret;
+            }
+            return this;
+          }
+          return this.each(function() {
+            const el = this;
+            const existing = elementDataStore.get(el)?.get(namespace) || K.data?.(el);
+            if (existing) {
+              const opt = existing;
+              if (opt.option) opt.option(option);
+            } else {
+              const Ctor = K;
+              const inst = new Ctor(el, option);
+              getDataMap(el).set(namespace, inst);
+            }
+          });
+        };
+      };
+    }
+    ;
+    $.batch = function(parent, elements) {
+      const frag = document.createDocumentFragment();
+      const arr = Array.isArray(elements) ? elements : Array.from(elements);
+      for (let i = 0, len = arr.length; i < len; i++) frag.appendChild(arr[i]);
+      parent.appendChild(frag);
+    };
+    const readQueue = [];
+    const writeQueue = [];
+    let rafScheduled = false;
+    function flushRAF() {
+      rafScheduled = false;
+      const reads = readQueue.splice(0, readQueue.length);
+      const writes = writeQueue.splice(0, writeQueue.length);
+      for (let i = 0, len = reads.length; i < len; i++) reads[i]();
+      for (let i = 0, len = writes.length; i < len; i++) writes[i]();
+    }
+    function scheduleRAF() {
+      if (!rafScheduled) {
+        rafScheduled = true;
+        requestAnimationFrame(flushRAF);
+      }
+    }
+    ;
+    $.raf = function(cb) {
+      return requestAnimationFrame(cb);
+    };
+    $.measure = function(cb) {
+      readQueue.push(cb);
+      scheduleRAF();
+    };
+    $.mutate = function(cb) {
+      writeQueue.push(cb);
+      scheduleRAF();
+    };
     mepto2.uniq = uniq;
     mepto2.deserializeValue = deserializeValue;
     $.mepto = mepto2;
